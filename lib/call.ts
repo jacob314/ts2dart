@@ -62,7 +62,17 @@ export default class CallTranspiler extends base.TranspilerBase {
     }
     this.emit('(');
     if (c.arguments && !this.handleNamedParamsCall(c)) {
-      this.visitList(c.arguments);
+      if ((<any>c).expression.text == 'RegExp') {
+        if (c.arguments.length > 1) {
+          if ((<any>c.arguments[1]).text == 'i') {
+            this.visit(c.arguments[0]);
+            this.emit(', caseSensitive: false)');
+            return;
+          }
+        }
+      } else {
+        this.visitList(c.arguments);
+      }
     }
     this.emit(')');
   }

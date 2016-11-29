@@ -19,6 +19,7 @@ export class TranspilerBase {
 
   visit(n: ts.Node) { this.transpiler.visit(n); }
   emit(s: string) { this.transpiler.emit(s); }
+  emitBefore(s: string, search: string) { this.transpiler.emitBefore(s, search); }
   emitNoSpace(s: string) { this.transpiler.emitNoSpace(s); }
   reportError(n: ts.Node, message: string) { this.transpiler.reportError(n, message); }
 

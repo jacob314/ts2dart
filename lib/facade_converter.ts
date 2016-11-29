@@ -140,7 +140,9 @@ export class FacadeConverter extends base.TranspilerBase {
     if (!this.candidateProperties.hasOwnProperty(ident)) return false;
     let symbol = this.tc.getSymbolAtLocation(pa.name);
     if (!symbol) {
-      this.reportMissingType(pa, ident);
+      if (!this.stdlibTypeReplacements[ident]) {
+          this.reportMissingType(pa, ident);
+      }
       return false;
     }
 
@@ -157,7 +159,8 @@ export class FacadeConverter extends base.TranspilerBase {
       'KeyboardEvent': 'dart:html',
       'Uint8Array': 'dart:typed_arrays',
       'ArrayBuffer': 'dart:typed_arrays',
-      'Promise': 'dart:async',
+        'Promise': 'dart:async',
+        'HttpRequest.getString': 'dart:html',
     };
     let emitted: Set = {};
     this.emitImports(sourceFile, libraries, emitted, sourceFile);
@@ -170,7 +173,7 @@ export class FacadeConverter extends base.TranspilerBase {
       if (libraries.hasOwnProperty(type)) {
         let toEmit = libraries[type];
         if (!emitted[toEmit]) {
-          this.emit(`import "${toEmit}";`);
+          this.emit(`import '${toEmit}';`);
           emitted[toEmit] = true;
         }
       }
@@ -276,9 +279,22 @@ export class FacadeConverter extends base.TranspilerBase {
     if (this.candidateTypes.hasOwnProperty(ident) && this.tc) {
       let symbol = this.tc.getSymbolAtLocation(typeName);
       if (!symbol) {
-        this.reportMissingType(typeName, ident);
+        if (!this.stdlibTypeReplacements[ident]) {
+          this.reportMissingType(typeName, ident);
+        } else {
+          this.emit(this.stdlibTypeReplacements[ident]);
+          if (ident == 'require') {
+              this.emitBefore('import \'dart:html\';', 'import');
+          } else if (ident == 'Math') {
+              this.emitBefore('import \'dart:math\' as Math;', 'import');
+          }
+        }
         return;
       }
+        if (this.stdlibTypeReplacements[ident]) {
+            this.emit(this.stdlibTypeReplacements[ident]);
+            return;
+        }
       let fileAndName = this.getFileAndName(typeName, symbol);
       if (fileAndName) {
         let fileSubs = this.tsToDartTypeNames[fileAndName.fileName];
@@ -476,6 +492,14 @@ export class FacadeConverter extends base.TranspilerBase {
     'Uint8Array': 'Uint8List',
     'ArrayBuffer': 'ByteBuffer',
     'Promise': 'Future',
+      'undefined': 'null',
+      'replace': 'replaceFirst',
+    'require': 'HttpRequest.getString',
+    'then': 'then',
+      'Object': 'Map',
+      'parseFloat': 'double.parse',
+      'parseInt': 'int.parse',
+      'Math': 'Math',
 
     // Dart has two different incompatible DOM APIs
     // https://github.com/angular/angular/issues/2770

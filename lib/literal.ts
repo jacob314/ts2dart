@@ -70,9 +70,9 @@ export default class LiteralTranspiler extends base.TranspilerBase {
         let propAssign = <ts.PropertyAssignment>node;
         if (propAssign.name.kind === ts.SyntaxKind.Identifier) {
           // Dart identifiers in Map literals need quoting.
-          this.emitNoSpace(' "');
+          this.emitNoSpace(' \'');
           this.emitNoSpace((<ts.Identifier>propAssign.name).text);
-          this.emitNoSpace('"');
+          this.emitNoSpace('\'');
         } else {
           this.visit(propAssign.name);
         }
@@ -81,9 +81,9 @@ export default class LiteralTranspiler extends base.TranspilerBase {
         break;
       case ts.SyntaxKind.ShorthandPropertyAssignment:
         let shorthand = <ts.ShorthandPropertyAssignment>node;
-        this.emitNoSpace(' "');
+        this.emitNoSpace(' \'');
         this.emitNoSpace(shorthand.name.text);
-        this.emitNoSpace('"');
+        this.emitNoSpace('\'');
         this.emit(':');
         this.visit(shorthand.name);
         break;

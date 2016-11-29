@@ -137,8 +137,12 @@ export class Transpiler {
         .filter((sourceFile: ts.SourceFile) => !sourceFile.fileName.match(/\.d\.ts$/))
         .forEach((f: ts.SourceFile) => {
           let dartCode = this.translate(f);
-          let outputFile = this.getOutputPath(f.fileName, destinationRoot);
+          let outputFile = this.getOutputPath(f.fileName, destinationRoot)
+              .replace(/([A-Z])/g, function($1){return "_"+$1.toLowerCase();});
+          if (outputFile.charAt(0) == '_')
+              outputFile = outputFile.substring(1);
           mkdirP(path.dirname(outputFile));
+          console.log(dartCode);
           fs.writeFileSync(outputFile, dartCode);
         });
     this.checkForErrors(program);
@@ -270,6 +274,7 @@ export class Transpiler {
   }
 
   emit(s: string) { this.output.emit(s); }
+  emitBefore(s: string, search: string) { this.output.emitBefore(s, search); }
   emitNoSpace(s: string) { this.output.emitNoSpace(s); }
 
   reportError(n: ts.Node, message: string) {
@@ -366,10 +371,25 @@ class Output {
     }
   }
 
-  emit(str: string) {
-    this.emitNoSpace(' ');
-    this.emitNoSpace(str);
-  }
+    emit(str: string) {
+        this.emitNoSpace(' ');
+        this.emitNoSpace(str);
+    }
+
+    emitBefore(str: string, search: string) {
+        const idx:number = this.result.indexOf(search);
+        if (idx < 0) return;
+        str = str + ' ';
+        this.result = this.result.substring(0, idx) + str + this.result.substring(idx);
+        for (let i = 0; i < str.length; i++) {
+            if (str[i] === '\n') {
+                this.line++;
+                this.column = 0;
+            } else {
+                this.column++;
+            }
+        }
+    }
 
   emitNoSpace(str: string) {
     this.result += str;

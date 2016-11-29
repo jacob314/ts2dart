@@ -209,14 +209,37 @@ export default class DeclarationTranspiler extends base.TranspilerBase {
         // Abstract classes are handled in `case ts.SyntaxKind.ClassDeclaration` above.
         break;
       case ts.SyntaxKind.PrivateKeyword:
+          this.emit('/*private*/');
         // no-op, handled through '_' naming convention in Dart.
         break;
       case ts.SyntaxKind.PublicKeyword:
-        // Handled in `visitDeclarationMetadata` below.
+          this.emit('/*public*/');
         break;
       case ts.SyntaxKind.ProtectedKeyword:
+          this.emit('/*protected*/');
+          break;
+      case ts.SyntaxKind.AwaitExpression:
         // Handled in `visitDeclarationMetadata` below.
+        this.emit('await');
+        this.visit((<any>node).expression);
         break;
+      case ts.SyntaxKind.AsyncKeyword:
+        (<any>this).__async = true;
+        break;
+      case ts.SyntaxKind.ObjectBindingPattern:
+          this.emit('/*');
+          const n: any = node;
+          let first: boolean = true;
+          for (var e of n.elements) {
+              if (!first) {
+                  this.emit(',');
+              }
+              first = false;
+              this.emit(e.name.text);
+          }
+          this.emit('*/');
+          break;
+
 
       default:
         return false;
@@ -333,6 +356,10 @@ export default class DeclarationTranspiler extends base.TranspilerBase {
     }
 
     this.emit(')');
+    if ((<any>this)['__async']) {
+      this.emit('async');
+      (<any>this)['__async'] = false;
+    }
   }
 
   /**
@@ -432,7 +459,7 @@ export default class DeclarationTranspiler extends base.TranspilerBase {
     this.visitEachIfPresent(decl.modifiers);
 
     if (this.hasFlag(decl.modifiers, ts.NodeFlags.Protected)) {
-      this.reportError(decl, 'protected declarations are unsupported');
+      // this.reportError(decl, 'protected declarations are unsupported');
       return;
     }
     if (!this.enforceUnderscoreConventions) return;

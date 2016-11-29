@@ -16,12 +16,16 @@ export default class ExpressionTranspiler extends base.TranspilerBase {
         switch (operatorKind) {
           case ts.SyntaxKind.EqualsEqualsEqualsToken:
           case ts.SyntaxKind.ExclamationEqualsEqualsToken:
-            if (operatorKind === ts.SyntaxKind.ExclamationEqualsEqualsToken) this.emit('!');
-            this.emit('identical (');
+            // this.emit('identical (');
             this.visit(binExpr.left);
-            this.emit(',');
+
+            if (operatorKind === ts.SyntaxKind.ExclamationEqualsEqualsToken) {
+              this.emit('!=');
+            } else {
+              this.emit('==');
+            }
             this.visit(binExpr.right);
-            this.emit(')');
+            // this.emit(')');
             break;
           case ts.SyntaxKind.CaretToken:
           case ts.SyntaxKind.BarToken:
@@ -88,13 +92,17 @@ export default class ExpressionTranspiler extends base.TranspilerBase {
         this.visit(conditional.whenFalse);
         break;
       case ts.SyntaxKind.DeleteExpression:
-        this.reportError(node, 'delete operator is unsupported');
+        this.emit('/*delete*/');
+        // this.reportError(node, 'delete operator is unsupported');
         break;
       case ts.SyntaxKind.VoidExpression:
-        this.reportError(node, 'void operator is unsupported');
+        this.emit('/*void*/');
+        // this.reportError(node, 'void operator is unsupported');
         break;
       case ts.SyntaxKind.TypeOfExpression:
-        this.reportError(node, 'typeof operator is unsupported');
+        this.emit('/*typeof*/');
+        this.visit((<any>node).expression);
+        // this.reportError(node, 'typeof operator is unsupported');
         break;
 
       case ts.SyntaxKind.ParenthesizedExpression:
