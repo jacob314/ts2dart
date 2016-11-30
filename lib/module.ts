@@ -121,14 +121,19 @@ export default class ModuleTranspiler extends base.TranspilerBase {
     let text = moduleName.text;
     if (text.match(/^\.\//)) {
       // Strip './' to be more Dart-idiomatic.
-      text = text.substring(2).replace(/([A-Z])/g, function($1){return "_"+$1.toLowerCase();}).substring(1);
+      text = text.substring(2).replace(/([A-Z])/g, function($1){return "_"+$1.toLowerCase();});
+      if (text.charAt(0) == '_') {
+        text = text.substring(1);
+      }
+      text = text.replace(/\/_/g, '\/');
     } else if (!text.match(/^\.\.\//)) {
       // Replace '@angular' with 'angular2' for Dart.
       text = text.replace(/^@keikai\//, 'keikai/');
       // Unprefixed/absolute imports are package imports.
       text = 'package:' + text;
     }
-    this.emit(JSON.stringify(text + '.dart'));
+    text = JSON.stringify(text + '.dart');
+    this.emit("'" + (text.substring(1, text.length - 1)) + "'");
   }
 
   private isEmptyImport(n: ts.ImportDeclaration): boolean {
