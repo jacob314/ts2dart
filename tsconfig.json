@@ -5,11 +5,12 @@
     "noEmit": true,
     "noEmitOnError": true,
     "noImplicitAny": true,
-    "noImplicitAny": true
+    "allowUnreachableCode": false
   },
   "exclude": [
     "node_modules",
     "build",
-    "test/e2e"
+    "test/e2e",
+    "test/tsc_e2e"
   ]
 }

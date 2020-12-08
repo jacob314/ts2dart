@@ -1,5 +1,4 @@
 # Compiled JS
-build
 
 # Logs
 logs
@@ -9,6 +8,7 @@ logs
 pids
 *.pid
 *.seed
+.phutil_module_cache
 
 # Type definitions installed with tsd
 typings
@@ -30,3 +30,7 @@ node_modules
 
 # Users Environment Variables
 .lock-wscript
+
+# IDEs
+.idea/
+/ts2dart.iml

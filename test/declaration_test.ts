@@ -1,5 +1,5 @@
 /// <reference path="../typings/mocha/mocha.d.ts"/>
-import {expectTranslate, expectErroneousCode} from './test_support';
+import {expectErroneousCode, expectTranslate} from './test_support';
 
 describe('variables', () => {
   it('should print variable declaration with initializer',
@@ -19,7 +19,7 @@ describe('variables', () => {
     expectTranslate('var a = 1, b = 0;').to.equal('var a = 1, b = 0;');
   });
   it('does not support vardecls containing more than one type (implicit or explicit)', () => {
-    var msg = 'Variables in a declaration list of more than one variable cannot by typed';
+    let msg = 'Variables in a declaration list of more than one variable cannot by typed';
     expectErroneousCode('var a: A, untyped;').to.throw(msg);
     expectErroneousCode('var untyped, b: B;').to.throw(msg);
     expectErroneousCode('var n: number, s: string;').to.throw(msg);
@@ -27,6 +27,10 @@ describe('variables', () => {
   });
 
   it('supports const', () => {
+    // NB: const X = CONST_EXPR(1); is translated as deep-const, see tests in facade_converter_test.
+    // Arbitrary expressions translate const ==> final...
+    expectTranslate('const A = 1 + 2;').to.equal('final A = 1 + 2;');
+    // ... but literals are special cased to be deep const.
     expectTranslate('const A = 1, B = 2;').to.equal('const A = 1, B = 2;');
     expectTranslate('const A: number = 1;').to.equal('const num A = 1;');
   });
@@ -56,6 +60,16 @@ describe('classes', () => {
 }`);
       expectTranslate('class X { x; }').to.equal(`class X {
   var x;
+}`);
+    });
+    it('supports function typed fields', () => {
+      expectTranslate(
+          'interface FnDef {(y: number): string;}\n' +
+          'class X { x: FnDef; }')
+          .to.equal(`typedef String FnDef(num y);
+
+class X {
+  FnDef x;
 }`);
     });
     it('supports field initializers', () => {
@@ -159,6 +173,17 @@ describe('classes', () => {
   final String foo;
   final bool _marbles;
   const X(this.foo, num b, [this._marbles = true]);
+}`);
+      expectTranslate(`/* @ts2dart_const */ class X {
+  constructor(public foo: string) {}
+  foo() { return new Bar(); }
+}`).to.equal(`/* @ts2dart_const */
+class X {
+  final String foo;
+  const X(this.foo);
+  foo() {
+    return new Bar();
+  }
 }`);
     });
   });

@@ -1,7 +1,8 @@
 import * as ts from 'typescript';
+
 import * as base from './base';
-import {Transpiler} from './main';
 import {FacadeConverter} from './facade_converter';
+import {Transpiler} from './main';
 
 export default class DeclarationTranspiler extends base.TranspilerBase {
   constructor(
@@ -13,11 +14,11 @@ export default class DeclarationTranspiler extends base.TranspilerBase {
     switch (node.kind) {
       case ts.SyntaxKind.VariableDeclarationList:
         // Note: VariableDeclarationList can only occur as part of a for loop.
-        var varDeclList = <ts.VariableDeclarationList>node;
+        let varDeclList = <ts.VariableDeclarationList>node;
         this.visitList(varDeclList.declarations);
         break;
       case ts.SyntaxKind.VariableDeclaration:
-        var varDecl = <ts.VariableDeclaration>node;
+        let varDecl = <ts.VariableDeclaration>node;
         this.visitVariableDeclarationType(varDecl);
         this.visit(varDecl.name);
         if (varDecl.initializer) {
@@ -27,14 +28,15 @@ export default class DeclarationTranspiler extends base.TranspilerBase {
         break;
 
       case ts.SyntaxKind.ClassDeclaration:
-        var classDecl = <ts.ClassDeclaration>node;
+        let classDecl = <ts.ClassDeclaration>node;
         if (classDecl.modifiers && (classDecl.modifiers.flags & ts.NodeFlags.Abstract)) {
-          this.emit('abstract');
+          this.visitClassLike('abstract class', classDecl);
+        } else {
+          this.visitClassLike('class', classDecl);
         }
-        this.visitClassLike('class', classDecl);
         break;
       case ts.SyntaxKind.InterfaceDeclaration:
-        var ifDecl = <ts.InterfaceDeclaration>node;
+        let ifDecl = <ts.InterfaceDeclaration>node;
         // Function type interface in an interface with a single declaration
         // of a call signature (http://goo.gl/ROC5jN).
         if (ifDecl.members.length === 1 && ifDecl.members[0].kind === ts.SyntaxKind.CallSignature) {
@@ -45,9 +47,9 @@ export default class DeclarationTranspiler extends base.TranspilerBase {
         }
         break;
       case ts.SyntaxKind.HeritageClause:
-        var heritageClause = <ts.HeritageClause>node;
+        let heritageClause = <ts.HeritageClause>node;
         if (heritageClause.token === ts.SyntaxKind.ExtendsKeyword &&
-            heritageClause.parent.kind != ts.SyntaxKind.InterfaceDeclaration) {
+            heritageClause.parent.kind !== ts.SyntaxKind.InterfaceDeclaration) {
           this.emit('extends');
         } else {
           this.emit('implements');
@@ -56,14 +58,14 @@ export default class DeclarationTranspiler extends base.TranspilerBase {
         this.visitList(heritageClause.types);
         break;
       case ts.SyntaxKind.ExpressionWithTypeArguments:
-        var exprWithTypeArgs = <ts.ExpressionWithTypeArguments>node;
+        let exprWithTypeArgs = <ts.ExpressionWithTypeArguments>node;
         this.visit(exprWithTypeArgs.expression);
         this.maybeVisitTypeArguments(exprWithTypeArgs);
         break;
       case ts.SyntaxKind.EnumDeclaration:
-        var decl = <ts.EnumDeclaration>node;
+        let decl = <ts.EnumDeclaration>node;
         // The only legal modifier for an enum decl is const.
-        var isConst = decl.modifiers && (decl.modifiers.flags & ts.NodeFlags.Const);
+        let isConst = decl.modifiers && (decl.modifiers.flags & ts.NodeFlags.Const);
         if (isConst) {
           this.reportError(node, 'const enums are not supported');
         }
@@ -79,25 +81,25 @@ export default class DeclarationTranspiler extends base.TranspilerBase {
         this.emit('}');
         break;
       case ts.SyntaxKind.EnumMember:
-        var member = <ts.EnumMember>node;
+        let member = <ts.EnumMember>node;
         this.visit(member.name);
         if (member.initializer) {
           this.reportError(node, 'enum initializers are not supported');
         }
         break;
       case ts.SyntaxKind.Constructor:
-        var ctorDecl = <ts.ConstructorDeclaration>node;
+        let ctorDecl = <ts.ConstructorDeclaration>node;
         // Find containing class name.
-        var className: ts.Identifier;
-        for (var parent = ctorDecl.parent; parent; parent = parent.parent) {
-          if (parent.kind == ts.SyntaxKind.ClassDeclaration) {
+        let className: ts.Identifier;
+        for (let parent = ctorDecl.parent; parent; parent = parent.parent) {
+          if (parent.kind === ts.SyntaxKind.ClassDeclaration) {
             className = (<ts.ClassDeclaration>parent).name;
             break;
           }
         }
         if (!className) this.reportError(ctorDecl, 'cannot find outer class node');
         this.visitDeclarationMetadata(ctorDecl);
-        if (this.isConst(<base.ClassLike>ctorDecl.parent)) {
+        if (this.fc.isConstClass(<base.ClassLike>ctorDecl.parent)) {
           this.emit('const');
         }
         this.visit(className);
@@ -123,17 +125,16 @@ export default class DeclarationTranspiler extends base.TranspilerBase {
         this.visitFunctionLike(<ts.AccessorDeclaration>node, 'set');
         break;
       case ts.SyntaxKind.FunctionDeclaration:
-        var funcDecl = <ts.FunctionDeclaration>node;
+        let funcDecl = <ts.FunctionDeclaration>node;
         this.visitDecorators(funcDecl.decorators);
-        if (funcDecl.typeParameters) this.reportError(node, 'generic functions are unsupported');
         this.visitFunctionLike(funcDecl);
         break;
       case ts.SyntaxKind.ArrowFunction:
-        var arrowFunc = <ts.FunctionExpression>node;
+        let arrowFunc = <ts.FunctionExpression>node;
         // Dart only allows expressions following the fat arrow operator.
         // If the body is a block, we have to drop the fat arrow and emit an
         // anonymous function instead.
-        if (arrowFunc.body.kind == ts.SyntaxKind.Block) {
+        if (arrowFunc.body.kind === ts.SyntaxKind.Block) {
           this.visitFunctionLike(arrowFunc);
         } else {
           this.visitParameters(arrowFunc.parameters);
@@ -142,20 +143,20 @@ export default class DeclarationTranspiler extends base.TranspilerBase {
         }
         break;
       case ts.SyntaxKind.FunctionExpression:
-        var funcExpr = <ts.FunctionExpression>node;
+        let funcExpr = <ts.FunctionExpression>node;
         this.visitFunctionLike(funcExpr);
         break;
       case ts.SyntaxKind.PropertySignature:
-        var propSig = <ts.PropertyDeclaration>node;
+        let propSig = <ts.PropertyDeclaration>node;
         this.visitProperty(propSig);
         break;
       case ts.SyntaxKind.MethodSignature:
-        var methodSignatureDecl = <ts.FunctionLikeDeclaration>node;
+        let methodSignatureDecl = <ts.FunctionLikeDeclaration>node;
         this.visitEachIfPresent(methodSignatureDecl.modifiers);
         this.visitFunctionLike(methodSignatureDecl);
         break;
       case ts.SyntaxKind.Parameter:
-        var paramDecl = <ts.ParameterDeclaration>node;
+        let paramDecl = <ts.ParameterDeclaration>node;
         // Property parameters will have an explicit property declaration, so we just
         // need the dart assignment shorthand to reference the property.
         if (this.hasFlag(paramDecl.modifiers, ts.NodeFlags.Public) ||
@@ -176,28 +177,29 @@ export default class DeclarationTranspiler extends base.TranspilerBase {
           break;
         }
         this.visitDecorators(paramDecl.decorators);
-        if (paramDecl.type) this.visit(paramDecl.type);
-        this.visit(paramDecl.name);
+
+        if (paramDecl.type && paramDecl.type.kind === ts.SyntaxKind.FunctionType) {
+          // Dart uses "returnType paramName ( parameters )" syntax.
+          let fnType = <ts.FunctionOrConstructorTypeNode>paramDecl.type;
+          let hasRestParameter = fnType.parameters.some(p => !!p.dotDotDotToken);
+          if (hasRestParameter) {
+            // Dart does not support rest parameters/varargs, degenerate to just "Function".
+            this.emit('Function');
+            this.visit(paramDecl.name);
+          } else {
+            this.visit(fnType.type);
+            this.visit(paramDecl.name);
+            this.visitParameters(fnType.parameters);
+          }
+        } else {
+          if (paramDecl.type) this.visit(paramDecl.type);
+          this.visit(paramDecl.name);
+        }
         if (paramDecl.initializer) {
           this.emit('=');
           this.visit(paramDecl.initializer);
         }
         break;
-      case ts.SyntaxKind.ObjectBindingPattern:
-        var bindingPattern = <ts.BindingPattern>node;
-        this.emit('{');
-        this.visitList(bindingPattern.elements);
-        this.emit('}');
-        break;
-      case ts.SyntaxKind.BindingElement:
-        var bindingElement = <ts.BindingElement>node;
-        this.visit(bindingElement.name);
-        if (bindingElement.initializer) {
-          this.emit(':');
-          this.visit(bindingElement.initializer);
-        }
-        break;
-
       case ts.SyntaxKind.StaticKeyword:
         this.emit('static');
         break;
@@ -207,14 +209,37 @@ export default class DeclarationTranspiler extends base.TranspilerBase {
         // Abstract classes are handled in `case ts.SyntaxKind.ClassDeclaration` above.
         break;
       case ts.SyntaxKind.PrivateKeyword:
+          this.emit('/*private*/');
         // no-op, handled through '_' naming convention in Dart.
         break;
       case ts.SyntaxKind.PublicKeyword:
-        // Handled in `visitDeclarationMetadata` below.
+          this.emit('/*public*/');
         break;
       case ts.SyntaxKind.ProtectedKeyword:
+          this.emit('/*protected*/');
+          break;
+      case ts.SyntaxKind.AwaitExpression:
         // Handled in `visitDeclarationMetadata` below.
+        this.emit('await');
+        this.visit((<any>node).expression);
         break;
+      case ts.SyntaxKind.AsyncKeyword:
+        (<any>this).__async = true;
+        break;
+      case ts.SyntaxKind.ObjectBindingPattern:
+          this.emit('/*');
+          const n: any = node;
+          let first: boolean = true;
+          for (var e of n.elements) {
+              if (!first) {
+                  this.emit(',');
+              }
+              first = false;
+              this.emit(e.name.text);
+          }
+          this.emit('*/');
+          break;
+
 
       default:
         return false;
@@ -233,13 +258,26 @@ export default class DeclarationTranspiler extends base.TranspilerBase {
      * - A variable declaration list with a single variable can be explicitly typed.
      * - When more than one variable is in the list, all must be implicitly typed.
      */
-    var firstDecl = varDecl.parent.declarations[0];
-    var msg = 'Variables in a declaration list of more than one variable cannot by typed';
-    var isConst = this.hasFlag(varDecl.parent, ts.NodeFlags.Const);
+    let firstDecl = varDecl.parent.declarations[0];
+    let msg = 'Variables in a declaration list of more than one variable cannot by typed';
+    let isFinal = this.hasFlag(varDecl.parent, ts.NodeFlags.Const);
+    let isConst = false;
+    if (isFinal && varDecl.initializer) {
+      // "const" in TypeScript/ES6 corresponds to "final" in Dart, i.e. reference constness.
+      // If a "const" variable is immediately initialized to a CONST_EXPR(), special case it to be
+      // a deeply const constant, and generate "const ...".
+      isConst = varDecl.initializer.kind === ts.SyntaxKind.StringLiteral ||
+          varDecl.initializer.kind === ts.SyntaxKind.NumericLiteral ||
+          this.fc.isConstExpr(varDecl.initializer);
+    }
     if (firstDecl === varDecl) {
-      if (isConst) this.emit('const');
+      if (isConst) {
+        this.emit('const');
+      } else if (isFinal) {
+        this.emit('final');
+      }
       if (!varDecl.type) {
-        if (!isConst) this.emit('var');
+        if (!isFinal) this.emit('var');
       } else if (varDecl.parent.declarations.length > 1) {
         this.reportError(varDecl, msg);
       } else {
@@ -251,30 +289,44 @@ export default class DeclarationTranspiler extends base.TranspilerBase {
   }
 
   private visitFunctionLike(fn: ts.FunctionLikeDeclaration, accessor?: string) {
-    if (fn.type) {
-      if (fn.kind === ts.SyntaxKind.ArrowFunction) {
-        // Type is silently dropped for arrow functions, not supported in Dart.
-        this.emit('/*');
-        this.visit(fn.type);
-        this.emit('*/');
+    this.fc.pushTypeParameterNames(fn);
+    try {
+      if (fn.type) {
+        if (fn.kind === ts.SyntaxKind.ArrowFunction ||
+            fn.kind === ts.SyntaxKind.FunctionExpression) {
+          // The return type is silently dropped for function expressions (including arrow
+          // functions), it is not supported in Dart.
+          this.emit('/*');
+          this.visit(fn.type);
+          this.emit('*/');
+        } else {
+          this.visit(fn.type);
+        }
+      }
+      if (accessor) this.emit(accessor);
+      if (fn.name) this.visit(fn.name);
+      if (fn.typeParameters) {
+        this.emit('/*<');
+        // Emit the names literally instead of visiting, otherwise they will be replaced with the
+        // comment hack themselves.
+        this.emit(fn.typeParameters.map(p => base.ident(p.name)).join(', '));
+        this.emit('>*/');
+      }
+      // Dart does not even allow the parens of an empty param list on getter
+      if (accessor !== 'get') {
+        this.visitParameters(fn.parameters);
       } else {
-        this.visit(fn.type);
+        if (fn.parameters && fn.parameters.length > 0) {
+          this.reportError(fn, 'getter should not accept parameters');
+        }
       }
-    }
-    if (accessor) this.emit(accessor);
-    if (fn.name) this.visit(fn.name);
-    // Dart does not even allow the parens of an empty param list on getter
-    if (accessor !== 'get') {
-      this.visitParameters(fn.parameters);
-    } else {
-      if (fn.parameters && fn.parameters.length > 0) {
-        this.reportError(fn, 'getter should not accept parameters');
+      if (fn.body) {
+        this.visit(fn.body);
+      } else {
+        this.emit(';');
       }
-    }
-    if (fn.body) {
-      this.visit(fn.body);
-    } else {
-      this.emit(';');
+    } finally {
+      this.fc.popTypeParameterNames(fn);
     }
   }
 
@@ -291,19 +343,23 @@ export default class DeclarationTranspiler extends base.TranspilerBase {
     }
 
     if (firstInitParamIdx !== 0) {
-      var requiredParams = parameters.slice(0, firstInitParamIdx);
+      let requiredParams = parameters.slice(0, firstInitParamIdx);
       this.visitList(requiredParams);
     }
 
     if (firstInitParamIdx !== parameters.length) {
       if (firstInitParamIdx !== 0) this.emit(',');
-      var positionalOptional = parameters.slice(firstInitParamIdx, parameters.length);
+      let positionalOptional = parameters.slice(firstInitParamIdx, parameters.length);
       this.emit('[');
       this.visitList(positionalOptional);
       this.emit(']');
     }
 
     this.emit(')');
+    if ((<any>this)['__async']) {
+      this.emit('async');
+      (<any>this)['__async'] = false;
+    }
   }
 
   /**
@@ -311,16 +367,16 @@ export default class DeclarationTranspiler extends base.TranspilerBase {
    * In the special case of property parameters in a constructor, we also allow a parameter to be
    * emitted as a property.
    */
-  private visitProperty(
-      decl: ts.PropertyDeclaration | ts.ParameterDeclaration, isParameter: boolean = false) {
+  private visitProperty(decl: ts.PropertyDeclaration|ts.ParameterDeclaration, isParameter = false) {
     if (!isParameter) this.visitDeclarationMetadata(decl);
-    var containingClass = <base.ClassLike>(isParameter ? decl.parent.parent : decl.parent);
-    var isConstField = this.hasAnnotation(decl.decorators, 'CONST');
+    let containingClass = <base.ClassLike>(isParameter ? decl.parent.parent : decl.parent);
+    let isConstField =
+        this.fc.hasConstComment(decl) || this.hasAnnotation(decl.decorators, 'CONST');
+    let hasConstCtor = this.fc.isConstClass(containingClass);
     if (isConstField) {
       // const implies final
       this.emit('const');
     } else {
-      var hasConstCtor = this.isConst(containingClass);
       if (hasConstCtor) {
         this.emit('final');
       }
@@ -360,19 +416,19 @@ export default class DeclarationTranspiler extends base.TranspilerBase {
       }
     };
     (<ts.NodeArray<ts.Declaration>>decl.members)
-        .filter((m) => m.kind == ts.SyntaxKind.Constructor)
+        .filter((m) => m.kind === ts.SyntaxKind.Constructor)
         .forEach(
             (ctor) =>
                 (<ts.ConstructorDeclaration>ctor).parameters.forEach(synthesizePropertyParam));
     this.visitEachIfPresent(decl.members);
 
     // Generate a constructor to host the const modifier, if needed
-    if (this.isConst(decl) &&
+    if (this.fc.isConstClass(decl) &&
         !(<ts.NodeArray<ts.Declaration>>decl.members)
-             .some((m) => m.kind == ts.SyntaxKind.Constructor)) {
-      this.emit("const");
+             .some((m) => m.kind === ts.SyntaxKind.Constructor)) {
+      this.emit('const');
       this.fc.visitTypeName(decl.name);
-      this.emit("();")
+      this.emit('();');
     }
     this.emit('}');
   }
@@ -382,10 +438,10 @@ export default class DeclarationTranspiler extends base.TranspilerBase {
 
     decorators.forEach((d) => {
       // Special case @CONST
-      var name = base.ident(d.expression);
+      let name = base.ident(d.expression);
       if (!name && d.expression.kind === ts.SyntaxKind.CallExpression) {
         // Unwrap @CONST()
-        var callExpr = (<ts.CallExpression>d.expression);
+        let callExpr = (<ts.CallExpression>d.expression);
         name = base.ident(callExpr.expression);
       }
       // Make sure these match IGNORED_ANNOTATIONS below.
@@ -403,16 +459,16 @@ export default class DeclarationTranspiler extends base.TranspilerBase {
     this.visitEachIfPresent(decl.modifiers);
 
     if (this.hasFlag(decl.modifiers, ts.NodeFlags.Protected)) {
-      this.reportError(decl, 'protected declarations are unsupported');
+      // this.reportError(decl, 'protected declarations are unsupported');
       return;
     }
     if (!this.enforceUnderscoreConventions) return;
     // Early return in case this is a decl with no name, such as a constructor
     if (!decl.name) return;
-    var name = base.ident(decl.name);
+    let name = base.ident(decl.name);
     if (!name) return;
-    var isPrivate = this.hasFlag(decl.modifiers, ts.NodeFlags.Private);
-    var matchesPrivate = !!name.match(/^_/);
+    let isPrivate = this.hasFlag(decl.modifiers, ts.NodeFlags.Private);
+    let matchesPrivate = !!name.match(/^_/);
     if (isPrivate && !matchesPrivate) {
       this.reportError(decl, 'private members must be prefixed with "_"');
     }
@@ -423,18 +479,44 @@ export default class DeclarationTranspiler extends base.TranspilerBase {
 
   private visitNamedParameter(paramDecl: ts.ParameterDeclaration) {
     this.visitDecorators(paramDecl.decorators);
-    if (paramDecl.type) {
-      // TODO(martinprobst): These are currently silently ignored.
-      // this.reportError(paramDecl.type, 'types on named parameters are unsupported');
-    }
-    this.visit(paramDecl.name);
-    if (paramDecl.initializer) {
-      if (paramDecl.initializer.kind !== ts.SyntaxKind.ObjectLiteralExpression ||
-          (<ts.ObjectLiteralExpression>paramDecl.initializer).properties.length > 0) {
-        this.reportError(
-            paramDecl, 'initializers for named parameters must be empty object literals');
+    let bp = <ts.BindingPattern>paramDecl.name;
+    let propertyTypes = this.fc.resolvePropertyTypes(paramDecl.type);
+    let initMap = this.getInitializers(paramDecl);
+    this.emit('{');
+    for (let i = 0; i < bp.elements.length; i++) {
+      let elem = bp.elements[i];
+      let propDecl = propertyTypes[base.ident(elem.name)];
+      if (propDecl && propDecl.type) this.visit(propDecl.type);
+      this.visit(elem.name);
+      if (elem.initializer && initMap[base.ident(elem.name)]) {
+        this.reportError(elem, 'cannot have both an inner and outer initializer');
       }
+      let init = elem.initializer || initMap[base.ident(elem.name)];
+      if (init) {
+        this.emit(':');
+        this.visit(init);
+      }
+      if (i + 1 < bp.elements.length) this.emit(',');
     }
+    this.emit('}');
+  }
+
+  private getInitializers(paramDecl: ts.ParameterDeclaration) {
+    let res: ts.Map<ts.Expression> = {};
+    if (!paramDecl.initializer) return res;
+    if (paramDecl.initializer.kind !== ts.SyntaxKind.ObjectLiteralExpression) {
+      this.reportError(paramDecl, 'initializers for named parameters must be object literals');
+      return res;
+    }
+    for (let i of (<ts.ObjectLiteralExpression>paramDecl.initializer).properties) {
+      if (i.kind !== ts.SyntaxKind.PropertyAssignment) {
+        this.reportError(i, 'named parameter initializers must be properties, got ' + i.kind);
+        continue;
+      }
+      let ole = <ts.PropertyAssignment>i;
+      res[base.ident(ole.name)] = ole.initializer;
+    }
+    return res;
   }
 
   /**

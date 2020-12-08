@@ -1,37 +1,43 @@
 {
   "name": "ts2dart",
-  "version": "0.8.0",
+  "version": "0.9.11",
   "description": "Transpile TypeScript code to Dart",
   "main": "build/lib/main.js",
+  "bin": "build/lib/main.js",
   "typings": "build/definitions/main.d.ts",
   "directories": {
     "test": "test"
   },
   "dependencies": {
-    "dart-style": "^0.2.6",
+    "dart-style": "^0.2.7",
     "minimist": "^1.1.1",
     "source-map": "^0.4.2",
     "source-map-support": "^0.3.1",
-    "typescript": "mprobst/TypeScript#pathMappingModuleResolution"
+    "typescript": "v1.9.0-dev.20160409"
   },
   "devDependencies": {
     "chai": "^2.1.1",
-    "clang-format": "^1.0.34",
+    "clang-format": "^1.0.37",
     "fs-extra": "^0.18.0",
     "gulp": "^3.8.11",
     "gulp-clang-format": "^1.0.21",
     "gulp-mocha": "^2.0.0",
     "gulp-sourcemaps": "^1.5.0",
+    "gulp-tslint": "^4.3.4",
     "gulp-typescript": "^2.7.6",
     "gulp-util": "^3.0.4",
     "merge2": "^0.3.1",
+    "npm-release": "^1.0.0",
     "temp": "^0.8.1",
     "tsd": "^0.6.0",
+    "tslint": "^3.7.1",
+    "typescript": "^2.0.0",
     "which": "^1.0.9"
   },
   "scripts": {
     "prepublish": "npm install tsd@^0.6.0 && tsd reinstall --overwrite && gulp compile",
-    "test": "gulp test"
+    "test": "gulp test",
+    "release": "npm-release"
   },
   "repository": {
     "type": "git",

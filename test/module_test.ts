@@ -31,6 +31,10 @@ describe('imports', () => {
   });
   it('fails for empty import specs',
      () => { expectErroneousCode('import {} from "baz";').to.throw(/empty import list/); });
+  it('translates angular/ references to angular2/', () => {
+    expectTranslate(`import {foo} from '@angular/foo';`)
+        .to.equal(`import "package:angular2/foo.dart" show foo;`);
+  });
 });
 
 describe('exports', () => {
@@ -58,14 +62,14 @@ describe('exports', () => {
 });
 
 describe('library name', () => {
-  var transpiler: main.Transpiler;
-  var modTranspiler: ModuleTranspiler;
+  let transpiler: main.Transpiler;
+  let modTranspiler: ModuleTranspiler;
   beforeEach(() => {
     transpiler = new main.Transpiler({failFast: true, generateLibraryName: true, basePath: '/a'});
     modTranspiler = new ModuleTranspiler(transpiler, new FacadeConverter(transpiler), true);
   });
   it('adds a library name', () => {
-    var results = translateSources(
+    let results = translateSources(
         {'/a/b/c.ts': 'var x;'}, {failFast: true, generateLibraryName: true, basePath: '/a'});
     chai.expect(results['/a/b/c.ts']).to.equal(`library b.c;
 
@@ -74,6 +78,8 @@ var x;
   });
   it('leaves relative paths alone',
      () => { chai.expect(modTranspiler.getLibraryName('a/b')).to.equal('a.b'); });
+  it('strips leading @ signs',
+     () => { chai.expect(modTranspiler.getLibraryName('@a/b')).to.equal('a.b'); });
   it('handles reserved words', () => {
     chai.expect(modTranspiler.getLibraryName('/a/for/in/do/x')).to.equal('_for._in._do.x');
   });

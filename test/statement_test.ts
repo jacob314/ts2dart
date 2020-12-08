@@ -1,5 +1,5 @@
 /// <reference path="../typings/mocha/mocha.d.ts"/>
-import {expectTranslate, expectErroneousCode} from './test_support';
+import {expectTranslate} from './test_support';
 
 describe('statements', () => {
   it('translates switch', () => {
@@ -32,6 +32,14 @@ describe('statements', () => {
   2;
 }`);
     expectTranslate('for (x in 1) { 2 }').to.equal(`for (x in 1) {
+  2;
+}`);
+  });
+  it('translates for-of loops', () => {
+    expectTranslate('for (var x of 1) { 2 }').to.equal(`for (var x in 1) {
+  2;
+}`);
+    expectTranslate('for (x of 1) { 2 }').to.equal(`for (x in 1) {
   2;
 }`);
   });
@@ -89,9 +97,9 @@ else
   console.log(e, e_stack);
 }`);
   });
-  it('rewrites rethrow to preserve stack trace',
-     () => {
-         expectTranslate('try {} catch (ex) { throw ex; }').to.equal(`try {} catch (ex, ex_stack) {
+  it('rewrites rethrow to preserve stack trace', () => {
+    expectTranslate('try {} catch (ex) { throw ex; }').to.equal(`try {} catch (ex, ex_stack) {
   rethrow;
-}`)});
+}`);
+  });
 });

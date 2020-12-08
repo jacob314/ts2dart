@@ -8,16 +8,25 @@ var gulp = require('gulp');
 var gutil = require('gulp-util');
 var merge = require('merge2');
 var mocha = require('gulp-mocha');
+var path = require('path');
 var sourcemaps = require('gulp-sourcemaps');
 var spawn = require('child_process').spawn;
 var ts = require('gulp-typescript');
 var typescript = require('typescript');
 var style = require('dart-style');
 var which = require('which');
+var tslint = require('gulp-tslint');
 
 gulp.task('test.check-format', function() {
   return gulp.src(['*.js', 'lib/**/*.ts', 'test/**/*.ts'])
       .pipe(formatter.checkFormat('file', clangFormat))
+      .on('warning', onError);
+});
+
+gulp.task('test.check-lint', function() {
+  return gulp.src(['lib/**/*.ts', 'test/**/*.ts'])
+      .pipe(tslint())
+      .pipe(tslint.report('verbose'))
       .on('warning', onError);
 });
 
@@ -84,15 +93,16 @@ gulp.task('test.e2e', ['test.compile'], function(done) {
   var dir = (__dirname.replace(/\\/g, '/') + '/build/e2e');
   if (fs.existsSync(dir)) fsx.removeSync(dir);
   fs.mkdirSync(dir);
-  fsx.copySync(__dirname + '/test/e2e', dir);
+  fsx.copySync(__dirname + '/test/e2e/pubspec.yaml', dir + '/pubspec.yaml');
 
   // run node with a shell so we can wildcard all the .ts files
-  var cmd = 'node ../lib/main.js --translateBuiltins --basePath=. --destination=. ' +
-      '*.ts angular2/src/facade/lang.d.ts';
+  var cmd = 'node build/lib/main.js --translateBuiltins --tsconfig test/e2e/tsconfig.json ' +
+      '--generateLibraryName=true ' +
+      'test/e2e/*.ts';
   // Paths must be relative to our source root, so run with cwd == dir.
-  spawn('sh', ['-c', cmd], {stdio: 'inherit', cwd: dir}).on('close', function(code, signal) {
+  spawn('sh', ['-c', cmd], {stdio: 'inherit'}).on('close', function(code, signal) {
     if (code > 0) {
-      onError(new Error("Failed to transpile " + testfile + '.ts'));
+      onError(new Error('Failed to transpile ' + testfile + '.ts'));
     } else {
       try {
         var opts = {stdio: 'inherit', cwd: dir};
@@ -110,7 +120,30 @@ gulp.task('test.e2e', ['test.compile'], function(done) {
   });
 });
 
-gulp.task('test', ['test.unit', 'test.check-format', 'test.e2e']);
+gulp.task('test.tsc_e2e', ['test.compile'], function(done) {
+  // Test that "tsconfig.json" is read correctly.
+  var outDir = (__dirname.replace(/\\/g, '/') + '/build/tsc_e2e');
+  if (fs.existsSync(outDir)) fsx.removeSync(outDir);
+  fs.mkdirSync(outDir);
+
+  var cmd = 'node build/lib/main.js --translateBuiltins --tsconfig test/tsc_e2e/tsconfig.json ' +
+      '--generateLibraryName=true ' +
+      'test/tsc_e2e/p1/user.ts';
+  spawn('sh', ['-c', cmd], {stdio: 'inherit'}).on('close', function(code, signal) {
+    if (code > 0) {
+      onError(new Error('Failed to transpile ' + testfile + '.ts'));
+      return;
+    }
+    var content = fs.readFileSync(path.join(outDir, 'p1/user.dart'), 'utf-8');
+    if (!content.match(/library p1\.user/) || !content.match(/import "package:mapped\/dep.dart"/) ||
+        !content.match(/Future/)) {
+      throw new Error('incorrect content in p1.dart:\n' + content)
+    }
+  });
+});
+
+gulp.task(
+    'test', ['test.check-format', 'test.check-lint', 'test.unit', 'test.e2e', 'test.tsc_e2e']);
 
 gulp.task('watch', ['test.unit'], function() {
   failOnError = false;

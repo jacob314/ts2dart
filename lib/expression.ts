@@ -1,7 +1,8 @@
 import * as ts from 'typescript';
+
 import * as base from './base';
-import {Transpiler} from './main';
 import {FacadeConverter} from './facade_converter';
+import {Transpiler} from './main';
 
 export default class ExpressionTranspiler extends base.TranspilerBase {
   constructor(tr: Transpiler, private fc: FacadeConverter) { super(tr); }
@@ -9,41 +10,81 @@ export default class ExpressionTranspiler extends base.TranspilerBase {
   visitNode(node: ts.Node): boolean {
     switch (node.kind) {
       case ts.SyntaxKind.BinaryExpression:
-        var binExpr = <ts.BinaryExpression>node;
-        var operatorKind = binExpr.operatorToken.kind;
-        if (operatorKind === ts.SyntaxKind.EqualsEqualsEqualsToken ||
-            operatorKind === ts.SyntaxKind.ExclamationEqualsEqualsToken) {
-          if (operatorKind === ts.SyntaxKind.ExclamationEqualsEqualsToken) this.emit('!');
-          this.emit('identical (');
-          this.visit(binExpr.left);
-          this.emit(',');
-          this.visit(binExpr.right);
-          this.emit(')');
-        } else {
-          this.visit(binExpr.left);
-          if (operatorKind === ts.SyntaxKind.InstanceOfKeyword) {
+        let binExpr = <ts.BinaryExpression>node;
+        let operatorKind = binExpr.operatorToken.kind;
+        let tokenStr = ts.tokenToString(operatorKind);
+        switch (operatorKind) {
+          case ts.SyntaxKind.EqualsEqualsEqualsToken:
+          case ts.SyntaxKind.ExclamationEqualsEqualsToken:
+            // this.emit('identical (');
+            this.visit(binExpr.left);
+
+            if (operatorKind === ts.SyntaxKind.ExclamationEqualsEqualsToken) {
+              this.emit('!=');
+            } else {
+              this.emit('==');
+            }
+            this.visit(binExpr.right);
+            // this.emit(')');
+            break;
+          case ts.SyntaxKind.CaretToken:
+          case ts.SyntaxKind.BarToken:
+          case ts.SyntaxKind.AmpersandToken:
+          case ts.SyntaxKind.GreaterThanGreaterThanToken:
+          case ts.SyntaxKind.LessThanLessThanToken:
+          case ts.SyntaxKind.CaretEqualsToken:
+          case ts.SyntaxKind.BarEqualsToken:
+          case ts.SyntaxKind.AmpersandEqualsToken:
+          case ts.SyntaxKind.GreaterThanGreaterThanEqualsToken:
+          case ts.SyntaxKind.LessThanLessThanEqualsToken:
+            // In Dart, the bitwise operators are only available on int, so the number types ts2dart
+            // deals with have to be converted to int explicitly to match JS's semantics in Dart.
+            if (tokenStr[tokenStr.length - 1] === '=') {
+              // For assignments, strip the trailing `=` sign to emit just the operator itself.
+              this.visit(binExpr.left);
+              this.emit('=');
+              this.visitAndWrapAsInt(binExpr.left);
+              this.emit(tokenStr.slice(0, -1));
+            } else {
+              // normal case (LHS [op])
+              this.visitAndWrapAsInt(binExpr.left);
+              this.emit(tokenStr);
+            }
+            this.visitAndWrapAsInt(binExpr.right);
+            break;
+          case ts.SyntaxKind.InKeyword:
+            this.reportError(node, 'in operator is unsupported');
+            break;
+          case ts.SyntaxKind.InstanceOfKeyword:
+            this.visit(binExpr.left);
             this.emit('is');
             this.fc.visitTypeName(<ts.Identifier>binExpr.right);
-          } else if (operatorKind == ts.SyntaxKind.InKeyword) {
-            this.reportError(node, 'in operator is unsupported');
-          } else {
-            this.emit(ts.tokenToString(binExpr.operatorToken.kind));
+            break;
+          default:
+            this.visit(binExpr.left);
+            this.emit(tokenStr);
             this.visit(binExpr.right);
-          }
+            break;
         }
         break;
       case ts.SyntaxKind.PrefixUnaryExpression:
-        var prefixUnary = <ts.PrefixUnaryExpression>node;
-        this.emit(ts.tokenToString(prefixUnary.operator));
-        this.visit(prefixUnary.operand);
+        let prefixUnary = <ts.PrefixUnaryExpression>node;
+        let operator = ts.tokenToString(prefixUnary.operator);
+        this.emit(operator);
+
+        if (prefixUnary.operator === ts.SyntaxKind.TildeToken) {
+          this.visitAndWrapAsInt(prefixUnary.operand);
+        } else {
+          this.visit(prefixUnary.operand);
+        }
         break;
       case ts.SyntaxKind.PostfixUnaryExpression:
-        var postfixUnary = <ts.PostfixUnaryExpression>node;
+        let postfixUnary = <ts.PostfixUnaryExpression>node;
         this.visit(postfixUnary.operand);
         this.emit(ts.tokenToString(postfixUnary.operator));
         break;
       case ts.SyntaxKind.ConditionalExpression:
-        var conditional = <ts.ConditionalExpression>node;
+        let conditional = <ts.ConditionalExpression>node;
         this.visit(conditional.condition);
         this.emit('?');
         this.visit(conditional.whenTrue);
@@ -51,24 +92,28 @@ export default class ExpressionTranspiler extends base.TranspilerBase {
         this.visit(conditional.whenFalse);
         break;
       case ts.SyntaxKind.DeleteExpression:
-        this.reportError(node, 'delete operator is unsupported');
+        this.emit('/*delete*/');
+        // this.reportError(node, 'delete operator is unsupported');
         break;
       case ts.SyntaxKind.VoidExpression:
-        this.reportError(node, 'void operator is unsupported');
+        this.emit('/*void*/');
+        // this.reportError(node, 'void operator is unsupported');
         break;
       case ts.SyntaxKind.TypeOfExpression:
-        this.reportError(node, 'typeof operator is unsupported');
+        this.emit('/*typeof*/');
+        this.visit((<any>node).expression);
+        // this.reportError(node, 'typeof operator is unsupported');
         break;
 
       case ts.SyntaxKind.ParenthesizedExpression:
-        var parenExpr = <ts.ParenthesizedExpression>node;
+        let parenExpr = <ts.ParenthesizedExpression>node;
         this.emit('(');
         this.visit(parenExpr.expression);
         this.emit(')');
         break;
 
       case ts.SyntaxKind.PropertyAccessExpression:
-        var propAccess = <ts.PropertyAccessExpression>node;
+        let propAccess = <ts.PropertyAccessExpression>node;
         if (propAccess.name.text === 'stack' &&
             this.hasAncestor(propAccess, ts.SyntaxKind.CatchClause)) {
           // Handle `e.stack` accesses in catch clauses by mangling to `e_stack`.
@@ -83,7 +128,7 @@ export default class ExpressionTranspiler extends base.TranspilerBase {
         }
         break;
       case ts.SyntaxKind.ElementAccessExpression:
-        var elemAccess = <ts.ElementAccessExpression>node;
+        let elemAccess = <ts.ElementAccessExpression>node;
         this.visit(elemAccess.expression);
         this.emit('[');
         this.visit(elemAccess.argumentExpression);
@@ -94,5 +139,16 @@ export default class ExpressionTranspiler extends base.TranspilerBase {
         return false;
     }
     return true;
+  }
+
+  visitAndWrapAsInt(n: ts.Expression) {
+    let lhsIsHexLit = n.kind === ts.SyntaxKind.NumericLiteral;
+    if (lhsIsHexLit) {
+      this.visit(n);
+      return;
+    }
+    this.emit('(');
+    this.visit(n);
+    this.emit('as int)');
   }
 }

@@ -1,12 +1,10 @@
 /// <reference path="../typings/chai/chai.d.ts"/>
 /// <reference path="../typings/mocha/mocha.d.ts"/>
 /// <reference path="../typings/source-map/source-map.d.ts"/>
-import SourceMap = require('source-map');
 import chai = require('chai');
 import main = require('../lib/main');
-import ts = require('typescript');
 
-import {expectTranslate, expectErroneousCode, translateSources} from './test_support';
+import {expectTranslate, expectErroneousCode} from './test_support';
 
 describe('main transpiler functionality', () => {
   describe('comments', () => {
@@ -41,12 +39,62 @@ class A {
       expectTranslate('/** {@link this/place} */ a').to.equal('/** [this/place] */ a;');
       expectTranslate('/* {@link 1} {@link 2} */ a').to.equal('/* [1] [2] */ a;');
     });
+    it('removes @module doc tags', () => {
+      expectTranslate(`/** @module
+  * This is a module for doing X.
+  */`).to.equal(`/** 
+  * This is a module for doing X.
+  */`);
+    });
+    it('removes @description doc tags', () => {
+      expectTranslate(`/** @description
+  * This is a module for doing X.
+  */`).to.equal(`/** 
+  * This is a module for doing X.
+  */`);
+    });
+    it('removes @depracted doc tags', () => {
+      expectTranslate(`/**
+  * Use SomethingElse instead.
+  * @deprecated
+  */`).to.equal(`/**
+  * Use SomethingElse instead.
+  * 
+  */`);
+    });
+    it('removes @param doc tags', () => {
+      expectTranslate(`/**
+  * Method to do blah.
+  * @param doc Document.
+  */`).to.equal(`/**
+  * Method to do blah.
+  * 
+  */`);
+    });
+    it('removes @return doc tags', () => {
+      expectTranslate(`/**
+  * Method to do blah.
+  * @return {String}
+  */`).to.equal(`/**
+  * Method to do blah.
+  * 
+  */`);
+    });
+    it('removes @throws doc tags', () => {
+      expectTranslate(`/**
+  * Method to do blah.
+  * @throws ArgumentException If arguments are wrong
+  */`).to.equal(`/**
+  * Method to do blah.
+  * 
+  */`);
+    });
   });
 
   describe('errors', () => {
     it('reports multiple errors', () => {
       // Reports both the private field not having an underbar and protected being unsupported.
-      var errorLines = new RegExp(
+      let errorLines = new RegExp(
           'delete operator is unsupported\n' +
           '.*void operator is unsupported');
       expectErroneousCode('delete x["y"]; void z;').to.throw(errorLines);
@@ -64,20 +112,20 @@ class A {
 
   describe('output paths', () => {
     it('writes within the path', () => {
-      var transpiler = new main.Transpiler({basePath: '/a'});
+      let transpiler = new main.Transpiler({basePath: '/a'});
       chai.expect(transpiler.getOutputPath('/a/b/c.js', '/x')).to.equal('/x/b/c.dart');
       chai.expect(transpiler.getOutputPath('b/c.js', '/x')).to.equal('/x/b/c.dart');
       chai.expect(transpiler.getOutputPath('b/c.js', 'x')).to.equal('x/b/c.dart');
       chai.expect(() => transpiler.getOutputPath('/outside/b/c.js', '/x'))
           .to.throw(/must be located under base/);
     });
-    it('defaults to writing to the same location', () => {
-      var transpiler = new main.Transpiler({basePath: undefined});
-      chai.expect(transpiler.getOutputPath('/a/b/c.js', '/e')).to.equal('/a/b/c.dart');
+    it('defaults to writing to the full path', () => {
+      let transpiler = new main.Transpiler({basePath: undefined});
+      chai.expect(transpiler.getOutputPath('/a/b/c.js', '/e')).to.equal('/e/a/b/c.dart');
       chai.expect(transpiler.getOutputPath('b/c.js', '')).to.equal('b/c.dart');
     });
     it('translates .es6, .ts, and .js', () => {
-      var transpiler = new main.Transpiler({basePath: undefined});
+      let transpiler = new main.Transpiler({basePath: undefined});
       ['a.js', 'a.ts', 'a.es6'].forEach(
           (n) => { chai.expect(transpiler.getOutputPath(n, '')).to.equal('a.dart'); });
     });
